@@ -152,6 +152,11 @@ it("on input focus, when the input has a value, trigger open()", () => {
   jest.runAllTimers();
 
   expect(spy).toBeCalledTimes(1);
+  expect(
+    predictiveSearchComponent.nodes.result.classList.contains(
+      predictiveSearchComponent.classes.visibleVariant
+    )
+  ).toBeTruthy();
 
   spy.mockRestore();
 });
@@ -453,6 +458,55 @@ it("on click intside the result dropdown, prevent closing", () => {
 
   spyOpen.mockRestore();
   spyClose.mockRestore();
+});
+
+it("closes the result dropdown on error", () => {
+  xhrMock.teardown();
+  xhrMock.setup();
+  xhrMock.get(/^\/search\/suggest\.json/g, (req, res) => {
+    return res
+      .status(418)
+      .header("Content-Type", "application/json")
+      .body(
+        JSON.stringify({
+          name: "You've got tea?",
+          message: "Because I'm a teapot!"
+        })
+      );
+  });
+
+  const spyHandlePredictiveSearchError = jest.spyOn(
+    PredictiveSearchComponent.prototype,
+    "_handlePredictiveSearchError"
+  );
+
+  const predictiveSearchComponent = new PredictiveSearchComponent({
+    selectors: {
+      input: '[data-predictive-search-input="default"]',
+      result: '[data-predictive-search-result="default"]'
+    },
+    resultTemplateFct: defaultResultTemplateFct
+  });
+
+  const input = document.querySelector(
+    '[data-predictive-search-input="default"]'
+  );
+  const evtFocus = new Event("focus");
+  const evtKeyup = new Event("keyup");
+
+  input.dispatchEvent(evtFocus);
+  input.setAttribute("value", "abc");
+  input.dispatchEvent(evtKeyup);
+
+  jest.runAllTimers();
+
+  expect(spyHandlePredictiveSearchError).toHaveBeenCalled();
+  expect(
+    predictiveSearchComponent.nodes.result.classList.contains(
+      predictiveSearchComponent.classes.visibleVariant
+    )
+  ).toBeFalsy();
+  expect(predictiveSearchComponent.isResultVisible).toBeFalsy();
 });
 
 it("kill()", () => {

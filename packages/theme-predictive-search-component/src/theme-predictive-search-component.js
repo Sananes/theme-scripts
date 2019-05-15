@@ -66,6 +66,12 @@ function PredictiveSearchComponent(config) {
     "success",
     this._handlePredictiveSearchSuccess.bind(this)
   );
+
+  // Add predictive search error event listener
+  this.predictiveSearch.on(
+    "error",
+    this._handlePredictiveSearchError.bind(this)
+  );
 }
 
 /**
@@ -310,6 +316,13 @@ PredictiveSearchComponent.prototype._handlePredictiveSearchSuccess = function(
 
     this._closeOnNoResults();
   }
+};
+
+PredictiveSearchComponent.prototype._handlePredictiveSearchError = function() {
+  clearTimeout(this._latencyTimer);
+  this.nodes.result.innerHTML = "";
+
+  this._closeOnNoResults();
 };
 
 PredictiveSearchComponent.prototype._closeOnNoResults = function() {
