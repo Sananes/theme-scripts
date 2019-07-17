@@ -10,9 +10,10 @@ function PredictiveSearchComponent(config) {
     !config.selectors.result ||
     !isString(config.selectors.result) ||
     !config.resultTemplateFct ||
-    !isFunction(config.resultTemplateFct)
+    !isFunction(config.resultTemplateFct) ||
+    config.PredictiveSearchAPIConfig == null
   ) {
-    var error = new TypeError("config is not valid");
+    var error = new TypeError("PredictiveSearchComponent config is not valid");
     error.type = "argument";
     throw error;
   }
@@ -38,7 +39,13 @@ function PredictiveSearchComponent(config) {
     visibleVariant:
       config.visibleVariant && config.visibleVariant.length > 0
         ? config.visibleVariant
-        : "predictive-search-wrapper--visible"
+        : "predictive-search-wrapper--visible",
+    itemSelected: config.itemSelectedClass
+      ? config.itemSelectedClass
+      : "predictive-search-item--selected",
+    clearButtonVisible: config.clearButtonVisibleClass
+      ? config.clearButtonVisibleClass
+      : "predictive-search__clear-button--visible"
   };
 
   // Assign callbacks
@@ -53,13 +60,16 @@ function PredictiveSearchComponent(config) {
   // Add body listener
   this._addBodyEventListener();
 
-  // Istantiate Predictive Search API
-  this.predictiveSearch = new PredictiveSearch({
-    resources: {
-      fuzzy: true,
-      types: [PredictiveSearch.TYPES.PRODUCT]
-    }
-  });
+  // Add accessibility announcer
+  this._addAccessibilityAnnouncer();
+
+  // Display the reset button if the input is not empty
+  this._toggleClearButtonVisibility();
+
+  // Instantiate Predictive Search API
+  this.predictiveSearch = new PredictiveSearch(
+    config.PredictiveSearchAPIConfig
+  );
 
   // Add predictive search success event listener
   this.predictiveSearch.on(
@@ -229,32 +239,93 @@ PredictiveSearchComponent.prototype._handleInputFocus = function(evt) {
 };
 
 PredictiveSearchComponent.prototype._handleInputBlur = function() {
-  if (isFunction(this.callbacks.onInputBlur)) {
-    var returnedValue = this.callbacks.onInputBlur(this.nodes);
+  setTimeout(
+    function() {
+      if (isFunction(this.callbacks.onInputBlur)) {
+        var returnedValue = this.callbacks.onInputBlur(this.nodes);
+        if (isBoolean(returnedValue) && !returnedValue) {
+          return false;
+        }
+      }
+
+      if (document.activeElement.isEqualNode(this.nodes.reset)) {
+        return false;
+      }
+
+      if (this._resultNodeClicked) {
+        this._resultNodeClicked = false;
+        return false;
+      }
+
+      this.close();
+    }.bind(this)
+  );
+
+  return true;
+};
+
+PredictiveSearchComponent.prototype._addAccessibilityAnnouncer = function() {
+  this._accessibilityAnnouncerDiv = window.document.createElement("div");
+
+  this._accessibilityAnnouncerDiv.setAttribute(
+    "style",
+    "position: absolute !important; overflow: hidden; clip: rect(0 0 0 0); height: 1px; width: 1px; margin: -1px; padding: 0; border: 0;"
+  );
+
+  this._accessibilityAnnouncerDiv.setAttribute("data-search-announcer", "");
+  this._accessibilityAnnouncerDiv.setAttribute("aria-live", "polite");
+  this._accessibilityAnnouncerDiv.setAttribute("aria-atomic", "true");
+
+  this.nodes.result.parentElement.append(this._accessibilityAnnouncerDiv);
+};
+
+PredictiveSearchComponent.prototype._removeAccessibilityAnnouncer = function() {
+  this.nodes.result.parentElement.removeChild(this._accessibilityAnnouncerDiv);
+};
+
+PredictiveSearchComponent.prototype._updateAccessibilityAnnouncer = function() {
+  var currentOption = this.nodes.result.querySelector(
+    "." + this.classes.itemSelected
+  );
+
+  this._accessibilityAnnouncerDiv.textContent = currentOption.querySelector(
+    "[data-search-result-detail]"
+  ).textContent;
+};
+
+PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
+  var UP_ARROW_KEY_CODE = 38;
+  var DOWN_ARROW_KEY_CODE = 40;
+  var RETURN_KEY_CODE = 13;
+  var ESCAPE_KEY_CODE = 27;
+
+  if (isFunction(this.callbacks.onInputKeyup)) {
+    var returnedValue = this.callbacks.onInputKeyup(this.nodes);
     if (isBoolean(returnedValue) && !returnedValue) {
       return false;
     }
   }
 
-  if (document.activeElement.isEqualNode(this.nodes.reset)) {
-    return false;
-  }
+  this._toggleClearButtonVisibility();
 
-  if (this._resultNodeClicked) {
-    this._resultNodeClicked = false;
-    return false;
-  }
+  if (this.isResultVisible && this.nodes !== null) {
+    if (evt.keyCode === UP_ARROW_KEY_CODE) {
+      this._navigateOption(evt, "UP");
+      return true;
+    }
 
-  this.close();
+    if (evt.keyCode === DOWN_ARROW_KEY_CODE) {
+      this._navigateOption(evt, "DOWN");
+      return true;
+    }
 
-  return true;
-};
+    if (evt.keyCode === RETURN_KEY_CODE) {
+      this._selectOption(evt, "DOWN");
+      return true;
+    }
 
-PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
-  if (isFunction(this.callbacks.onInputKeyup)) {
-    var returnedValue = this.callbacks.onInputKeyup(this.nodes);
-    if (isBoolean(returnedValue) && !returnedValue) {
-      return false;
+    if (evt.keyCode === ESCAPE_KEY_CODE) {
+      this.close();
     }
   }
 
@@ -278,8 +349,48 @@ PredictiveSearchComponent.prototype._handleInputReset = function(evt) {
   }
 
   this.nodes.input.value = "";
+  this.nodes.input.focus();
+  this._toggleClearButtonVisibility();
+  this.close();
 
   return true;
+};
+
+PredictiveSearchComponent.prototype._navigateOption = function(evt, direction) {
+  var currentOption = this.nodes.result.querySelector(
+    "." + this.classes.itemSelected
+  );
+
+  if (!currentOption) {
+    var firstOption = this.nodes.result.querySelector("[data-search-result]");
+    firstOption.classList.add(this.classes.itemSelected);
+    this._updateAccessibilityAnnouncer();
+  } else {
+    if (direction === "DOWN") {
+      var nextOption = currentOption.nextElementSibling;
+      if (nextOption) {
+        currentOption.classList.remove(this.classes.itemSelected);
+        nextOption.classList.add(this.classes.itemSelected);
+        this._updateAccessibilityAnnouncer();
+      }
+    } else {
+      var previousOption = currentOption.previousElementSibling;
+      if (previousOption) {
+        currentOption.classList.remove(this.classes.itemSelected);
+        previousOption.classList.add(this.classes.itemSelected);
+        this._updateAccessibilityAnnouncer();
+      }
+    }
+  }
+};
+
+PredictiveSearchComponent.prototype._selectOption = function() {
+  var selectedOption = this.nodes.result.querySelector(
+    "." + this.classes.itemSelected
+  );
+  if (selectedOption) {
+    selectedOption.querySelector("a, button").click();
+  }
 };
 
 PredictiveSearchComponent.prototype._search = function() {
@@ -307,8 +418,11 @@ PredictiveSearchComponent.prototype._handlePredictiveSearchSuccess = function(
 
   this.results.isLoading = false;
   this.results.products = this.results.products.slice(0, this.numberOfResults);
+  this.results.canLoadMore =
+    this.numberOfResults <= this.results.products.length;
+  this.results.searchQuery = this.nodes.input.value;
 
-  if (this.results.products.length > 0) {
+  if (this.results.products.length > 0 || this.results.searchQuery) {
     this.nodes.result.innerHTML = this.resultTemplateFct(this.results);
     this.open();
   } else {
@@ -349,6 +463,7 @@ PredictiveSearchComponent.prototype.open = function() {
   }
 
   this.nodes.result.classList.add(this.classes.visibleVariant);
+  this.nodes.input.setAttribute("aria-expanded", true);
   this.isResultVisible = true;
 
   if (isFunction(this.callbacks.onOpen)) {
@@ -356,6 +471,18 @@ PredictiveSearchComponent.prototype.open = function() {
   }
 
   return true;
+};
+
+PredictiveSearchComponent.prototype._toggleClearButtonVisibility = function() {
+  if (!this.nodes.reset) {
+    return;
+  }
+
+  if (this.nodes.input.value.length > 0) {
+    this.nodes.reset.classList.add(this.classes.clearButtonVisible);
+  } else {
+    this.nodes.reset.classList.remove(this.classes.clearButtonVisible);
+  }
 };
 
 PredictiveSearchComponent.prototype.close = function() {
@@ -374,6 +501,8 @@ PredictiveSearchComponent.prototype.close = function() {
     this.nodes.result.classList.remove(this.classes.visibleVariant);
   }
 
+  this.nodes.input.setAttribute("aria-expanded", false);
+
   if (isFunction(this.callbacks.onClose)) {
     this.callbacks.onClose(this.nodes);
   }
@@ -385,8 +514,10 @@ PredictiveSearchComponent.prototype.close = function() {
 };
 
 PredictiveSearchComponent.prototype.kill = function() {
+  this.close();
+
   if (isFunction(this.callbacks.onBeforeKill)) {
-    var returnedValue = this.callbacks.onBeforeKill();
+    var returnedValue = this.callbacks.onBeforeKill(this.nodes);
     if (isBoolean(returnedValue) && !returnedValue) {
       return false;
     }
@@ -396,12 +527,18 @@ PredictiveSearchComponent.prototype.kill = function() {
   removeInputAttributes(this.nodes.input);
   this._removeInputEventListeners();
   this._removeBodyEventListener();
+  this._removeAccessibilityAnnouncer();
 
   if (isFunction(this.callbacks.onKill)) {
-    this.callbacks.onKill();
+    this.callbacks.onKill(this.nodes);
   }
 
   return true;
+};
+
+PredictiveSearchComponent.prototype.clearAndClose = function() {
+  this.nodes.input.value = "";
+  this.close();
 };
 
 /**
