@@ -164,10 +164,12 @@ PredictiveSearchComponent.prototype._addInputEventListeners = function() {
   this._handleInputFocus = this._handleInputFocus.bind(this);
   this._handleInputBlur = this._handleInputBlur.bind(this);
   this._handleInputKeyup = this._handleInputKeyup.bind(this);
+  this._handleInputKeydown = this._handleInputKeydown.bind(this);
 
   input.addEventListener("focus", this._handleInputFocus);
   input.addEventListener("blur", this._handleInputBlur);
   input.addEventListener("keyup", this._handleInputKeyup);
+  input.addEventListener("keydown", this._handleInputKeydown);
 
   if (reset) {
     this._handleInputReset = this._handleInputReset.bind(this);
@@ -181,6 +183,7 @@ PredictiveSearchComponent.prototype._removeInputEventListeners = function() {
   input.removeEventListener("focus", this._handleInputFocus);
   input.removeEventListener("blur", this._handleInputBlur);
   input.removeEventListener("keyup", this._handleInputKeyup);
+  input.removeEventListener("keydown", this._handleInputKeydown);
   input.removeEventListener("search", this._handleInputReset);
 };
 
@@ -239,6 +242,9 @@ PredictiveSearchComponent.prototype._handleInputFocus = function(evt) {
 };
 
 PredictiveSearchComponent.prototype._handleInputBlur = function() {
+  // This has to be done async, to wait for the focus to be on the next
+  // element and avoid closing the results.
+  // Example: Going from the input to the reset button.
   setTimeout(
     function() {
       if (isFunction(this.callbacks.onInputBlur)) {
@@ -283,14 +289,32 @@ PredictiveSearchComponent.prototype._removeAccessibilityAnnouncer = function() {
   this.nodes.result.parentElement.removeChild(this._accessibilityAnnouncerDiv);
 };
 
-PredictiveSearchComponent.prototype._updateAccessibilityAnnouncer = function() {
-  var currentOption = this.nodes.result.querySelector(
-    "." + this.classes.itemSelected
-  );
-
-  this._accessibilityAnnouncerDiv.textContent = currentOption.querySelector(
+PredictiveSearchComponent.prototype._updateAccessibilityAttributesAfterSelectingElement = function(
+  previousSelectedElement,
+  currentSelectedElement
+) {
+  // Announce the information of the element that was selected.
+  this._accessibilityAnnouncerDiv.textContent = currentSelectedElement.querySelector(
     "[data-search-result-detail]"
   ).textContent;
+
+  // Update the active descendant on the search input
+  this.nodes.input.setAttribute(
+    "aria-activedescendant",
+    currentSelectedElement.id
+  );
+
+  // Unmark the previousSelected elemented as selected
+  if (previousSelectedElement) {
+    previousSelectedElement.removeAttribute("aria-selected");
+  }
+
+  // Mark the element as selected
+  currentSelectedElement.setAttribute("aria-selected", true);
+};
+
+PredictiveSearchComponent.prototype._clearAriaActiveDescendant = function() {
+  this.nodes.input.setAttribute("aria-activedescendant", "");
 };
 
 PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
@@ -320,7 +344,7 @@ PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
     }
 
     if (evt.keyCode === RETURN_KEY_CODE) {
-      this._selectOption(evt, "DOWN");
+      this._selectOption();
       return true;
     }
 
@@ -336,6 +360,15 @@ PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
   }
 
   return true;
+};
+
+PredictiveSearchComponent.prototype._handleInputKeydown = function(evt) {
+  var RETURN_KEY_CODE = 13;
+
+  // Prevent the form default submission if there is a selected option
+  if (evt.keyCode === RETURN_KEY_CODE && this._getSelectedOption() != null) {
+    evt.preventDefault();
+  }
 };
 
 PredictiveSearchComponent.prototype._handleInputReset = function(evt) {
@@ -357,37 +390,44 @@ PredictiveSearchComponent.prototype._handleInputReset = function(evt) {
 };
 
 PredictiveSearchComponent.prototype._navigateOption = function(evt, direction) {
-  var currentOption = this.nodes.result.querySelector(
-    "." + this.classes.itemSelected
-  );
+  var currentOption = this._getSelectedOption();
 
   if (!currentOption) {
     var firstOption = this.nodes.result.querySelector("[data-search-result]");
     firstOption.classList.add(this.classes.itemSelected);
-    this._updateAccessibilityAnnouncer();
+    this._updateAccessibilityAttributesAfterSelectingElement(null, firstOption);
   } else {
     if (direction === "DOWN") {
       var nextOption = currentOption.nextElementSibling;
       if (nextOption) {
         currentOption.classList.remove(this.classes.itemSelected);
         nextOption.classList.add(this.classes.itemSelected);
-        this._updateAccessibilityAnnouncer();
+        this._updateAccessibilityAttributesAfterSelectingElement(
+          currentOption,
+          nextOption
+        );
       }
     } else {
       var previousOption = currentOption.previousElementSibling;
       if (previousOption) {
         currentOption.classList.remove(this.classes.itemSelected);
         previousOption.classList.add(this.classes.itemSelected);
-        this._updateAccessibilityAnnouncer();
+        this._updateAccessibilityAttributesAfterSelectingElement(
+          currentOption,
+          previousOption
+        );
       }
     }
   }
 };
 
+PredictiveSearchComponent.prototype._getSelectedOption = function() {
+  return this.nodes.result.querySelector("." + this.classes.itemSelected);
+};
+
 PredictiveSearchComponent.prototype._selectOption = function() {
-  var selectedOption = this.nodes.result.querySelector(
-    "." + this.classes.itemSelected
-  );
+  var selectedOption = this._getSelectedOption();
+
   if (selectedOption) {
     selectedOption.querySelector("a, button").click();
   }
@@ -502,6 +542,7 @@ PredictiveSearchComponent.prototype.close = function() {
   }
 
   this.nodes.input.setAttribute("aria-expanded", false);
+  this._clearAriaActiveDescendant();
 
   if (isFunction(this.callbacks.onClose)) {
     this.callbacks.onClose(this.nodes);
