@@ -11,7 +11,11 @@ function PredictiveSearchComponent(config) {
     !isString(config.selectors.result) ||
     !config.resultTemplateFct ||
     !isFunction(config.resultTemplateFct) ||
-    config.PredictiveSearchAPIConfig == null
+    config.PredictiveSearchAPIConfig == null ||
+    !config.numberOfResultsTemplateFct ||
+    !isFunction(config.numberOfResultsTemplateFct) ||
+    !config.loadingResultsMessageTemplateFct ||
+    !isFunction(config.loadingResultsMessageTemplateFct)
   ) {
     var error = new TypeError("PredictiveSearchComponent config is not valid");
     error.type = "argument";
@@ -28,24 +32,39 @@ function PredictiveSearchComponent(config) {
     return;
   }
 
+  // Store the keyword that was used for the search
+  this._searchKeyword = "";
+
   // Assign result template
   this.resultTemplateFct = config.resultTemplateFct;
+
+  // Assign number of results template
+  this.numberOfResultsTemplateFct = config.numberOfResultsTemplateFct;
+
+  // Assign loading state template function
+  this.loadingResultsMessageTemplateFct =
+    config.loadingResultsMessageTemplateFct;
 
   // Assign number of search results
   this.numberOfResults = config.numberOfResults || 4;
 
   // Set classes
   this.classes = {
-    visibleVariant:
-      config.visibleVariant && config.visibleVariant.length > 0
-        ? config.visibleVariant
-        : "predictive-search-wrapper--visible",
+    visibleVariant: config.visibleVariant
+      ? config.visibleVariant
+      : "predictive-search-wrapper--visible",
     itemSelected: config.itemSelectedClass
       ? config.itemSelectedClass
       : "predictive-search-item--selected",
     clearButtonVisible: config.clearButtonVisibleClass
       ? config.clearButtonVisibleClass
       : "predictive-search__clear-button--visible"
+  };
+
+  this.selectors = {
+    searchResult: config.searchResult
+      ? config.searchResult
+      : "[data-search-result]"
   };
 
   // Assign callbacks
@@ -282,7 +301,7 @@ PredictiveSearchComponent.prototype._addAccessibilityAnnouncer = function() {
   this._accessibilityAnnouncerDiv.setAttribute("aria-live", "polite");
   this._accessibilityAnnouncerDiv.setAttribute("aria-atomic", "true");
 
-  this.nodes.result.parentElement.append(this._accessibilityAnnouncerDiv);
+  this.nodes.result.parentElement.appendChild(this._accessibilityAnnouncerDiv);
 };
 
 PredictiveSearchComponent.prototype._removeAccessibilityAnnouncer = function() {
@@ -293,11 +312,6 @@ PredictiveSearchComponent.prototype._updateAccessibilityAttributesAfterSelecting
   previousSelectedElement,
   currentSelectedElement
 ) {
-  // Announce the information of the element that was selected.
-  this._accessibilityAnnouncerDiv.textContent = currentSelectedElement.querySelector(
-    "[data-search-result-detail]"
-  ).textContent;
-
   // Update the active descendant on the search input
   this.nodes.input.setAttribute(
     "aria-activedescendant",
@@ -317,11 +331,31 @@ PredictiveSearchComponent.prototype._clearAriaActiveDescendant = function() {
   this.nodes.input.setAttribute("aria-activedescendant", "");
 };
 
+PredictiveSearchComponent.prototype._announceNumberOfResultsFound = function(
+  results
+) {
+  var currentAnnouncedMessage = this._accessibilityAnnouncerDiv.innerHTML;
+  var newMessage = this.numberOfResultsTemplateFct(results);
+
+  // If the messages are the same, they won't get announced
+  // add white space so it gets announced
+  if (currentAnnouncedMessage === newMessage) {
+    newMessage = newMessage + "&nbsp;";
+  }
+
+  this._accessibilityAnnouncerDiv.innerHTML = newMessage;
+};
+
+PredictiveSearchComponent.prototype._announceLoadingState = function() {
+  this._accessibilityAnnouncerDiv.innerHTML = this.loadingResultsMessageTemplateFct();
+};
+
 PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
   var UP_ARROW_KEY_CODE = 38;
   var DOWN_ARROW_KEY_CODE = 40;
   var RETURN_KEY_CODE = 13;
   var ESCAPE_KEY_CODE = 27;
+  var BACKSPACE = 8;
 
   if (isFunction(this.callbacks.onInputKeyup)) {
     var returnedValue = this.callbacks.onInputKeyup(this.nodes);
@@ -353,8 +387,9 @@ PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
     }
   }
 
-  if (evt.which === 8 && evt.target.value.length <= 0) {
+  if (BACKSPACE === 8 && evt.target.value.length <= 0) {
     this.close();
+    this._setKeyword("");
   } else if (evt.target.value.length > 0) {
     this._search();
   }
@@ -364,9 +399,19 @@ PredictiveSearchComponent.prototype._handleInputKeyup = function(evt) {
 
 PredictiveSearchComponent.prototype._handleInputKeydown = function(evt) {
   var RETURN_KEY_CODE = 13;
+  var UP_ARROW_KEY_CODE = 38;
+  var DOWN_ARROW_KEY_CODE = 40;
 
   // Prevent the form default submission if there is a selected option
   if (evt.keyCode === RETURN_KEY_CODE && this._getSelectedOption() != null) {
+    evt.preventDefault();
+  }
+
+  // Prevent the cursor from moving in the input when using the up and down arrow keys
+  if (
+    evt.keyCode === UP_ARROW_KEY_CODE ||
+    evt.keyCode === DOWN_ARROW_KEY_CODE
+  ) {
     evt.preventDefault();
   }
 };
@@ -393,7 +438,9 @@ PredictiveSearchComponent.prototype._navigateOption = function(evt, direction) {
   var currentOption = this._getSelectedOption();
 
   if (!currentOption) {
-    var firstOption = this.nodes.result.querySelector("[data-search-result]");
+    var firstOption = this.nodes.result.querySelector(
+      this.selectors.searchResult
+    );
     firstOption.classList.add(this.classes.itemSelected);
     this._updateAccessibilityAttributesAfterSelectingElement(null, firstOption);
   } else {
@@ -434,20 +481,30 @@ PredictiveSearchComponent.prototype._selectOption = function() {
 };
 
 PredictiveSearchComponent.prototype._search = function() {
+  var newSearchKeyword = this.nodes.input.value;
+
+  if (this._searchKeyword === newSearchKeyword) {
+    return;
+  }
+
   clearTimeout(this._latencyTimer);
   this._latencyTimer = setTimeout(
     function() {
       this.results.isLoading = true;
+
+      // Annonuce that we're loading the results
+      this._announceLoadingState();
 
       this.nodes.result.classList.add(this.classes.visibleVariant);
       // NOTE: We could benifit in using DOMPurify.
       // https://github.com/cure53/DOMPurify
       this.nodes.result.innerHTML = this.resultTemplateFct(this.results);
     }.bind(this),
-    300
+    500
   );
 
-  this.predictiveSearch.query(this.nodes.input.value);
+  this.predictiveSearch.query(newSearchKeyword);
+  this._setKeyword(newSearchKeyword);
 };
 
 PredictiveSearchComponent.prototype._handlePredictiveSearchSuccess = function(
@@ -464,6 +521,7 @@ PredictiveSearchComponent.prototype._handlePredictiveSearchSuccess = function(
 
   if (this.results.products.length > 0 || this.results.searchQuery) {
     this.nodes.result.innerHTML = this.resultTemplateFct(this.results);
+    this._announceNumberOfResultsFound(this.results);
     this.open();
   } else {
     this.nodes.result.innerHTML = "";
@@ -485,6 +543,10 @@ PredictiveSearchComponent.prototype._closeOnNoResults = function() {
   }
 
   this.isResultVisible = false;
+};
+
+PredictiveSearchComponent.prototype._setKeyword = function(keyword) {
+  this._searchKeyword = keyword;
 };
 
 /**
@@ -543,6 +605,7 @@ PredictiveSearchComponent.prototype.close = function() {
 
   this.nodes.input.setAttribute("aria-expanded", false);
   this._clearAriaActiveDescendant();
+  this._setKeyword("");
 
   if (isFunction(this.callbacks.onClose)) {
     this.callbacks.onClose(this.nodes);
