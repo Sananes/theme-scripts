@@ -2,10 +2,8 @@ import { validateQuery } from "./validate";
 import request from "./request";
 import { debounce, objectToQueryParams, Dispatcher, Cache } from "./utilities";
 
-var requestDebounced = debounce(
-  request,
-  PredictiveSearch.prototype.DEBOUNCE_RATE
-);
+var DEBOUNCE_RATE = 10;
+var requestDebounced = debounce(request, DEBOUNCE_RATE);
 
 export default function PredictiveSearch(config) {
   if (!config) {
@@ -24,7 +22,11 @@ PredictiveSearch.TYPES = {
   PRODUCT: "product"
 };
 
-PredictiveSearch.prototype.DEBOUNCE_RATE = 10;
+PredictiveSearch.UNAVAILABLE_PRODUCTS = {
+  SHOW: "show",
+  HIDE: "hide",
+  BURY: "bury"
+};
 
 PredictiveSearch.prototype.query = function query(query) {
   try {

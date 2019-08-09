@@ -5,7 +5,6 @@ import searchAsYouTypeTheCallingFixture from "../__fixtures__/search_as_you_type
 /* eslint-disable camelcase */
 const defaultConfig = {
   resources: {
-    fuzzy: true,
     types: [PredictiveSearch.TYPES.PRODUCT]
   }
 };

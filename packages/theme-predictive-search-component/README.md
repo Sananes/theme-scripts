@@ -17,7 +17,7 @@ const predictivesearch = new PredictiveSearch({
         <ul class="predictive-search__list">
           ${products.map(
             product => `
-            <li>
+            <li data-search-result> <!-- important to add the data-search-result attribute to each result -->
               <img src="${product.image}" alt="${product.title}" />
               <span>${produtc.title}</span>
             </li>
@@ -26,6 +26,23 @@ const predictivesearch = new PredictiveSearch({
         </ul>
       </div>
     `;
+  },
+  // (a11y) Function to return the number of results that you will display.
+  // This will be announced to the user via an aria-live.
+  numberOfResultsTemplateFct: data => {
+    if (data.products.length === 1) {
+      return "one result found";
+    } else {
+      return "[results_count] results found".replace(
+        "[results_count]",
+        data.products.length
+      );
+    }
+  },
+  // (a11y) Return a string that indicates that we're loading results.
+  // This will be announced to the user via an aria-live.
+  loadingResultsMessageTemplateFct: () => {
+    return "loading";
   },
   onInputFocus: nodes => {
     // You can get a reference to active target
@@ -49,9 +66,10 @@ const predictivesearch = new PredictiveSearch({
 });
 
 // Public methods
-predictivesearch.open();
-predictivesearch.close();
-predictivesearch.kill();
+predictiveSearch.open();
+predictiveSearch.close();
+predictiveSearch.kill();
+predictiveSearch.clearAndClose();
 ```
 
 ---

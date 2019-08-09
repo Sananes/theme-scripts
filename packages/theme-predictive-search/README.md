@@ -1,6 +1,6 @@
 ## Shopify Predictive Search JS API
 
-### Configuration options 
+### Configuration options
 
 <table>
   <tr>
@@ -22,14 +22,9 @@
           <td>Specifies the type of results requested. Currently supports <code>product</code> only.</td>
         </tr>
         <tr>
-          <td><code>fuzzy</code> (optional)</td>
-          <td>Boolean</td>
-          <td>Enables typo tolerance when searching. A typo will be tolerated after the fourth character. Default: <code>true</code>.</td>
-        </tr>
-        <tr>
           <td><code>unavailable_products</code> (optional)</td>
           <td>String</td>
-          <td>Specifies whether to display <code>unavailable_products</code> results. The three possible options are <code>show</code>, <code>hide</code>, and <code>bury</code>. Burying out of stock products pushes them below other matching results.  Default: <code>show</code>.</td>
+          <td>Specifies whether to display <code>unavailable_products</code> results. The three possible options are <code>PredictiveSearch.UNAVAILABLE_PRODUCTS.SHOW</code>, <code>PredictiveSearch.UNAVAILABLE_PRODUCTS.HIDE</code>, and <code>PredictiveSearch.UNAVAILABLE_PRODUCTS.BURY</code>. Burying out of stock products pushes them below other matching results.  Default: <code>show</code>.</td>
         </tr>
         <tr>
           <td><code>limit</code> (optional)</td>
@@ -52,10 +47,9 @@ import PredictiveSearch from "@shopify/theme-predictive-search";
 
 var predictiveSearch = new PredictiveSearch({
   resources: {
-    fuzzy: true,
     types: [PredictiveSearch.TYPES.PRODUCT],
     limit: 4,
-    unavailable_products: "bury"
+    unavailable_products: PredictiveSearch.UNAVAILABLE_PRODUCTS.BURY
   }
 });
 
@@ -98,7 +92,7 @@ predictiveSearch.query("The Calling");
               "image": "https://cdn.shopify.com/...",
               "price": "3099",
               "compare_at_price": "4099",
-              "available": true,
+              "available": true
             }
           ]
         }

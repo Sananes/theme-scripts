@@ -10,6 +10,7 @@
  */
 
 import xhrMock from "xhr-mock";
+import { create } from "domain";
 import PredictiveSearchComponent from "../src/theme-predictive-search-component";
 import searchAsYouTypeTheCallingFixture from "../__fixtures__/search_as_you_type_the_calling.json";
 
@@ -18,7 +19,7 @@ function defaultResultTemplateFct(data) {
     <ul>
       ${data.products.map(
         item => `
-          <li>
+          <li data-search-result="">
             <a href="${item.url}">
               <img src="${item.title}" />
               <span>${item.title}</span>
@@ -29,6 +30,22 @@ function defaultResultTemplateFct(data) {
       )}
     </ul>
   `;
+}
+
+function createPredictiveSearchComponent(config) {
+  const predictiveSearchComponent = new PredictiveSearchComponent({
+    selectors: {
+      input: '[data-predictive-search-input="default"]',
+      result: '[data-predictive-search-mount="default"]',
+      reset: '[data-predictive-search-reset="default"]'
+    },
+    resultTemplateFct: defaultResultTemplateFct,
+    numberOfResultsTemplateFct: () => {},
+    loadingResultsMessageTemplateFct: () => {},
+    ...config
+  });
+
+  return predictiveSearchComponent;
 }
 
 beforeEach(() => {
@@ -47,7 +64,7 @@ beforeEach(() => {
       <input data-predictive-search-input="default" type="text" />
       <button type="reset" data-predictive-search-reset="default">Reset</button>
       <button type="submit">Submit</button>
-      <div data-predictive-search-result="default" />
+      <div data-predictive-search-mount="default" />
     </form>
   `;
 });
@@ -57,13 +74,7 @@ afterEach(() => {
 });
 
 it("create an instance of PredictiveSearchComponent", () => {
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   expect(predictiveSearchComponent).toBeInstanceOf(PredictiveSearchComponent);
 });
@@ -73,9 +84,9 @@ it("throws on invalid config", () => {
     const predictiveSearchComponent = new PredictiveSearchComponent({
       selectors: {
         input: '[data-predictive-search-input="default"]',
-        result: '[data-predictive-search-result="default"]'
+        result: '[data-predictive-search-mount="default"]'
       },
-      resultTemplateFct: "NOT A FUCNTION"
+      resultTemplateFct: "NOT A FUNCTION"
     });
   }).toThrow();
 
@@ -105,7 +116,7 @@ it("throws on invalid config", () => {
     const predictiveSearchComponent = new PredictiveSearchComponent({
       selectors: {
         input: '[data-predictive-search-input="default"]',
-        result: '[data-predictive-search-result="default"]'
+        result: '[data-predictive-search-mount="default"]'
       }
     });
   }).toThrow();
@@ -113,12 +124,7 @@ it("throws on invalid config", () => {
 
 it("on input focus, trigger the callback onInputFocus()", () => {
   const spyOnInputFocus = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onInputFocus: spyOnInputFocus
   });
 
@@ -133,13 +139,7 @@ it("on input focus, trigger the callback onInputFocus()", () => {
 
 it("on input focus, when the input has a value, trigger open()", () => {
   const spy = jest.spyOn(PredictiveSearchComponent.prototype, "open");
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
@@ -163,12 +163,7 @@ it("on input focus, when the input has a value, trigger open()", () => {
 
 it("on input keyup, with at least one character, calls onBeforeOpen()", () => {
   const spy = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onBeforeOpen: spy
   });
 
@@ -190,12 +185,7 @@ it("on input keyup, with at least one character, calls onBeforeOpen()", () => {
 
 it("has the ability to stop the event in onBeforeOpen()", () => {
   const spy = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onBeforeOpen: () => false,
     onOpen: spy
   });
@@ -218,13 +208,7 @@ it("has the ability to stop the event in onBeforeOpen()", () => {
 
 it("on input keyup, with at least one character, calls open()", () => {
   const spy = jest.spyOn(PredictiveSearchComponent.prototype, "open");
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
@@ -248,12 +232,7 @@ it("on input keyup, with at least one character, calls open()", () => {
 it("on input keyup, with at least one character, calls onOpen() only once", () => {
   const spyOpen = jest.spyOn(PredictiveSearchComponent.prototype, "open");
   const spy = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onOpen: spy
   });
 
@@ -281,12 +260,7 @@ it("on input keyup, with at least one character, calls onOpen() only once", () =
 
 it("on input keyup, with no character, calls onBeforeClose()", () => {
   const spy = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onBeforeClose: spy
   });
 
@@ -314,12 +288,7 @@ it("on input keyup, with no character, calls onBeforeClose()", () => {
 
 it("has the ability to stop the event in onBeforeClose()", () => {
   const spy = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onBeforeClose: () => false,
     onClose: spy
   });
@@ -346,13 +315,7 @@ it("has the ability to stop the event in onBeforeClose()", () => {
 
 it("on input keyup, with no character, calls close()", () => {
   const spy = jest.spyOn(PredictiveSearchComponent.prototype, "close");
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
@@ -381,12 +344,7 @@ it("on input blur, call close()", () => {
   const spyOpen = jest.spyOn(PredictiveSearchComponent.prototype, "open");
   const spyClose = jest.spyOn(PredictiveSearchComponent.prototype, "close");
   const spyOnClose = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onClose: spyOnClose
   });
   let nodes = null;
@@ -419,22 +377,16 @@ it("on input blur, call close()", () => {
   spyClose.mockRestore();
 });
 
-it("on click intside the result dropdown, prevent closing", () => {
+it("on click inside the result dropdown, prevent closing", () => {
   const spyOpen = jest.spyOn(PredictiveSearchComponent.prototype, "open");
   const spyClose = jest.spyOn(PredictiveSearchComponent.prototype, "close");
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
   );
   const result = document.querySelector(
-    '[data-predictive-search-result="default"]'
+    '[data-predictive-search-mount="default"]'
   );
   const evtFocus = new Event("focus");
   const evtKeyup = new Event("keyup");
@@ -480,13 +432,7 @@ it("closes the result dropdown on error", () => {
     "_handlePredictiveSearchError"
   );
 
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct
-  });
+  const predictiveSearchComponent = createPredictiveSearchComponent();
 
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
@@ -507,6 +453,80 @@ it("closes the result dropdown on error", () => {
     )
   ).toBeFalsy();
   expect(predictiveSearchComponent.isResultVisible).toBeFalsy();
+});
+
+it("Doesn't perform a search if the search keyword hasn't change", () => {
+  const spySearch = jest.spyOn(PredictiveSearchComponent.prototype, "_search");
+
+  const predictiveSearchComponent = createPredictiveSearchComponent();
+  const searchRequestSpy = jest.spyOn(
+    predictiveSearchComponent.predictiveSearch,
+    "query"
+  );
+
+  const input = document.querySelector(
+    '[data-predictive-search-input="default"]'
+  );
+
+  const evtFocus = new Event("focus");
+  const evtKeyup = new Event("keyup");
+
+  input.dispatchEvent(evtFocus);
+  input.setAttribute("value", "abc");
+  input.dispatchEvent(evtKeyup);
+  input.dispatchEvent(evtKeyup);
+
+  jest.runAllTimers();
+
+  expect(spySearch).toHaveBeenCalledTimes(2);
+  expect(searchRequestSpy).toHaveBeenCalledTimes(1);
+
+  spySearch.mockRestore();
+  searchRequestSpy.mockRestore();
+});
+
+it("When reset is clicked, the input value is cleared and results are closed", () => {
+  const spyHandleInputResetEvt = jest.spyOn(
+    PredictiveSearchComponent.prototype,
+    "_handleInputReset"
+  );
+  const predictiveSearchComponent = createPredictiveSearchComponent();
+  const reset = document.querySelector(
+    '[data-predictive-search-reset="default"]'
+  );
+  const input = document.querySelector(
+    '[data-predictive-search-input="default"]'
+  );
+
+  const evtFocus = new Event("focus");
+  const evtKeyup = new Event("keyup");
+  const evtClick = new Event("click");
+
+  input.dispatchEvent(evtFocus);
+  input.setAttribute("value", "abc");
+  input.dispatchEvent(evtKeyup);
+  jest.runAllTimers();
+
+  expect(input.value).toBe("abc");
+  expect(
+    predictiveSearchComponent.nodes.result.classList.contains(
+      predictiveSearchComponent.classes.visibleVariant
+    )
+  ).toBeTruthy();
+  expect(predictiveSearchComponent._searchKeyword).toBe("abc");
+
+  reset.dispatchEvent(evtClick);
+
+  expect(input.value).toBe("");
+  expect(spyHandleInputResetEvt).toHaveBeenCalledTimes(1);
+  expect(
+    predictiveSearchComponent.nodes.result.classList.contains(
+      predictiveSearchComponent.classes.visibleVariant
+    )
+  ).toBeFalsy();
+  expect(predictiveSearchComponent._searchKeyword).toBe("");
+
+  spyHandleInputResetEvt.mockRestore();
 });
 
 it("kill()", () => {
@@ -532,17 +552,10 @@ it("kill()", () => {
   );
   const spyOnBeforeKill = jest.fn();
   const spyOnKill = jest.fn();
-  const predictiveSearchComponent = new PredictiveSearchComponent({
-    selectors: {
-      input: '[data-predictive-search-input="default"]',
-      reset: '[data-predictive-search-reset="default"]',
-      result: '[data-predictive-search-result="default"]'
-    },
-    resultTemplateFct: defaultResultTemplateFct,
+  const predictiveSearchComponent = createPredictiveSearchComponent({
     onBeforeKill: spyOnBeforeKill,
     onKill: spyOnKill
   });
-
   const input = document.querySelector(
     '[data-predictive-search-input="default"]'
   );
@@ -561,10 +574,10 @@ it("kill()", () => {
   reset.dispatchEvent(evtClick);
   document.body.dispatchEvent(evtMousedown);
 
-  expect(spyHandleInputFocusEvt).toHaveBeenCalledTimes(1);
+  expect(spyHandleInputFocusEvt).toHaveBeenCalledTimes(2);
   expect(spyHandleInputBlurEvt).toHaveBeenCalledTimes(1);
-  expect(spyHandleInputKeyupEvt).toHaveBeenCalledTimes(1);
   expect(spyHandleInputResetEvt).toHaveBeenCalledTimes(1);
+  expect(spyHandleInputKeyupEvt).toHaveBeenCalledTimes(1);
   expect(spyHandleBodyMousedownEvt).toHaveBeenCalledTimes(1);
 
   jest.runAllTimers();
@@ -577,7 +590,7 @@ it("kill()", () => {
   predictiveSearchComponent.nodes.input.dispatchEvent(evtClick);
   document.body.dispatchEvent(evtMousedown);
 
-  expect(spyHandleInputFocusEvt).toHaveBeenCalledTimes(1);
+  expect(spyHandleInputFocusEvt).toHaveBeenCalledTimes(2);
   expect(spyHandleInputBlurEvt).toHaveBeenCalledTimes(1);
   expect(spyHandleInputKeyupEvt).toHaveBeenCalledTimes(1);
   expect(spyHandleInputResetEvt).toHaveBeenCalledTimes(1);
@@ -591,4 +604,74 @@ it("kill()", () => {
   spyHandleInputBlurEvt.mockRestore();
   spyHandleInputKeyupEvt.mockRestore();
   spyHandleInputResetEvt.mockRestore();
+});
+
+/**  a11y tests  **/
+
+it("supports arrow navigation", () => {
+  const predictiveSearchComponent = createPredictiveSearchComponent();
+  const input = document.querySelector(
+    '[data-predictive-search-input="default"]'
+  );
+  const evtFocus = new Event("focus");
+  const downArrowKeyCode = 40;
+  const upArrowCode = 38;
+  const evtKeyup = new Event("keyup");
+  const evtKeyupArrowDown = new Event("keyup");
+  evtKeyupArrowDown.keyCode = downArrowKeyCode;
+  const evtKeyupArrowUp = new Event("keyup");
+  evtKeyupArrowUp.keyCode = upArrowCode;
+
+  input.dispatchEvent(evtFocus);
+
+  input.setAttribute("value", "abc");
+  input.dispatchEvent(evtKeyup);
+
+  jest.runAllTimers();
+
+  input.dispatchEvent(evtKeyupArrowDown);
+
+  jest.runAllTimers();
+
+  const results = document.querySelectorAll(
+    predictiveSearchComponent.selectors.searchResult
+  );
+  const firstResult = results[0];
+  const secondResult = results[1];
+
+  expect(
+    firstResult.classList.contains(
+      predictiveSearchComponent.classes.itemSelected
+    )
+  ).toBeTruthy();
+
+  input.dispatchEvent(evtKeyupArrowDown);
+
+  expect(
+    firstResult.classList.contains(
+      predictiveSearchComponent.classes.itemSelected
+    )
+  ).toBeFalsy();
+
+  expect(
+    secondResult.classList.contains(
+      predictiveSearchComponent.classes.itemSelected
+    )
+  ).toBeTruthy();
+
+  input.dispatchEvent(evtKeyupArrowUp);
+
+  expect(
+    firstResult.classList.contains(
+      predictiveSearchComponent.classes.itemSelected
+    )
+  ).toBeTruthy();
+
+  expect(
+    secondResult.classList.contains(
+      predictiveSearchComponent.classes.itemSelected
+    )
+  ).toBeFalsy();
+
+  jest.runAllTimers();
 });

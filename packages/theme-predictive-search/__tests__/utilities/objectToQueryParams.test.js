@@ -6,14 +6,12 @@ describe("objectToQueryParams", () => {
     const obj = {
       foo: "foo",
       resources: {
-        fuzzy: true,
         types: ["product", "collection"]
       }
     };
 
     expect(objectToQueryParams(obj)).toBe(
       "foo=foo&" +
-        "resources[fuzzy]=true&" +
         "resources[types][]=product&" +
         "resources[types][]=collection&"
     );

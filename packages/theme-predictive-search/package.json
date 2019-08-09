@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "license": "MIT",
   "description": "Shopify AJAX Predictive Search API",
-  "main": "dist/theme-predictive-search.js",
+  "main": "dist/theme-predictive-search.cjs.js",
   "module": "src/theme-predictive-search.js",
   "publishConfig": {
     "access": "public",

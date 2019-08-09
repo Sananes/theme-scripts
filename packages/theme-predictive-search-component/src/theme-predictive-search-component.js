@@ -1,5 +1,12 @@
 import PredictiveSearch from "@shopify/theme-predictive-search";
 
+var DEFAULT_PREDICTIVE_SEARCH_API_CONFIG = {
+  resources: {
+    types: [PredictiveSearch.TYPES.PRODUCT],
+    unavailable_products: PredictiveSearch.UNAVAILABLE_PRODUCTS.BURY
+  }
+};
+
 function PredictiveSearchComponent(config) {
   // validate config
   if (
@@ -11,7 +18,6 @@ function PredictiveSearchComponent(config) {
     !isString(config.selectors.result) ||
     !config.resultTemplateFct ||
     !isFunction(config.resultTemplateFct) ||
-    config.PredictiveSearchAPIConfig == null ||
     !config.numberOfResultsTemplateFct ||
     !isFunction(config.numberOfResultsTemplateFct) ||
     !config.loadingResultsMessageTemplateFct ||
@@ -88,6 +94,8 @@ function PredictiveSearchComponent(config) {
   // Instantiate Predictive Search API
   this.predictiveSearch = new PredictiveSearch(
     config.PredictiveSearchAPIConfig
+      ? config.PredictiveSearchAPIConfig
+      : DEFAULT_PREDICTIVE_SEARCH_API_CONFIG
   );
 
   // Add predictive search success event listener
@@ -203,7 +211,6 @@ PredictiveSearchComponent.prototype._removeInputEventListeners = function() {
   input.removeEventListener("blur", this._handleInputBlur);
   input.removeEventListener("keyup", this._handleInputKeyup);
   input.removeEventListener("keydown", this._handleInputKeydown);
-  input.removeEventListener("search", this._handleInputReset);
 };
 
 PredictiveSearchComponent.prototype._addBodyEventListener = function() {
@@ -218,6 +225,16 @@ PredictiveSearchComponent.prototype._removeBodyEventListener = function() {
   document
     .querySelector("body")
     .removeEventListener("mousedown", this._handleBodyMousedown);
+};
+
+PredictiveSearchComponent.prototype._removeClearButtonEventListener = function() {
+  var reset = this.nodes.reset;
+
+  if (!reset) {
+    return;
+  }
+
+  reset.removeEventListener("click", this._handleInputReset);
 };
 
 /**
@@ -549,6 +566,18 @@ PredictiveSearchComponent.prototype._setKeyword = function(keyword) {
   this._searchKeyword = keyword;
 };
 
+PredictiveSearchComponent.prototype._toggleClearButtonVisibility = function() {
+  if (!this.nodes.reset) {
+    return;
+  }
+
+  if (this.nodes.input.value.length > 0) {
+    this.nodes.reset.classList.add(this.classes.clearButtonVisible);
+  } else {
+    this.nodes.reset.classList.remove(this.classes.clearButtonVisible);
+  }
+};
+
 /**
  * Public methods
  */
@@ -573,18 +602,6 @@ PredictiveSearchComponent.prototype.open = function() {
   }
 
   return true;
-};
-
-PredictiveSearchComponent.prototype._toggleClearButtonVisibility = function() {
-  if (!this.nodes.reset) {
-    return;
-  }
-
-  if (this.nodes.input.value.length > 0) {
-    this.nodes.reset.classList.add(this.classes.clearButtonVisible);
-  } else {
-    this.nodes.reset.classList.remove(this.classes.clearButtonVisible);
-  }
 };
 
 PredictiveSearchComponent.prototype.close = function() {
@@ -632,6 +649,7 @@ PredictiveSearchComponent.prototype.kill = function() {
   this._removeInputEventListeners();
   this._removeBodyEventListener();
   this._removeAccessibilityAnnouncer();
+  this._removeClearButtonEventListener();
 
   if (isFunction(this.callbacks.onKill)) {
     this.callbacks.onKill(this.nodes);
